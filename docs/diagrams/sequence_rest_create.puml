@@ -1,0 +1,45 @@
+@startuml
+' Sequence diagram: REST Create/Replace Trade
+title REST Create/Replace Trade (with Idempotency)
+
+participant Client
+participant API as "Trade API\n(Controller)"
+participant Idem as "Idempotency Service"
+participant Service as "TradeService"
+participant Repo as "TradeRepository (DB)"
+participant DB as "Postgres / H2"
+
+Client -> API: POST /api/v1/trades\n{trade + Idempotency-Key}
+API -> Idem: check(idempotencyKey)
+alt idempotency hit
+    Idem --> API: previousResponse
+    API --> Client: 200/201 (cached response)
+else no idempotency
+    API -> Service: createOrReplace(dto)
+    Service -> Repo: findTopByTradeIdForUpdate(tradeId)\n(pessimistic lock)
+    Repo -> DB: SELECT ... FOR UPDATE
+    DB --> Repo: latestRecord
+    alt incoming.version < latest.version
+        Repo --> Service: latest
+        Service --> API: throw LOWER_VERSION
+        API --> Client: 409 LOWER_VERSION
+    else incoming.version == latest.version
+        Service -> Repo: update existing record
+        Repo -> DB: UPDATE trades SET ...
+        DB --> Repo: ok
+        Repo --> Service: saved
+        Service --> API: result (upsert)
+        API -> Idem: save(idempotencyKey, response)
+        API --> Client: 200 OK (replaced)
+    else incoming.version > latest.version or no latest
+        Service -> Repo: insert new record
+        Repo -> DB: INSERT INTO trades ...
+        DB --> Repo: ok
+        Repo --> Service: saved
+        Service --> API: result (created)
+        API -> Idem: save(idempotencyKey, response)
+        API --> Client: 201 Created
+    end
+end
+
+@enduml

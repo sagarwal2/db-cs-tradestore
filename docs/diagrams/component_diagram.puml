@@ -1,0 +1,37 @@
+@startuml
+' Component diagram for Trade Store
+
+package "Clients" {
+  [REST Clients] as RESTClient
+  [Batch Jobs / SFTP] as Batch
+  [Kafka Producers] as KafkaProd
+}
+
+package "Trade Store Service" {
+  component "API\n(TradeController)" as API
+  component "Business Service\n(TradeService)" as BS
+  component "Idempotency Service\n(IdempotencyService)" as IS
+  component "Kafka Listener\n(TradeKafkaListener)" as KL
+  component "Scheduler\n(TradeExpiryScheduler)" as SCH
+  component "Repository\n(TradeRepository)" as REPO
+}
+
+package "Infra" {
+  [Postgres/H2] as DB
+  [Kafka] as KAFKA
+  [Prometheus] as PROM
+}
+
+RESTClient --> API: HTTP requests
+API --> IS: check/save idempotency
+API --> BS: create/get/search
+KL --> IS: check/save idempotency
+KL --> BS: createOrReplace
+BS --> REPO: queries (findTop, save, markExpired)
+REPO --> DB: SQL
+SCH --> BS: markExpired()
+BS --> PROM: metrics
+KAFKA --> KL: topic messages
+KafkaProd --> KAFKA: produce trades
+
+@enduml

@@ -1,0 +1,33 @@
+@startuml
+' Sequence diagram: Kafka consume trade message
+title Kafka Consumer Flow (idempotent)
+
+participant Kafka as "Kafka Topic (trades)"
+participant Consumer as "TradeKafkaListener"
+participant Idem as "Idempotency Service"
+participant Service as "TradeService"
+participant Repo as "TradeRepository (DB)"
+participant DB as "Postgres / H2"
+
+Kafka -> Consumer: message(key?, value=jsonTrade)
+Consumer -> Idem: check(idKey)
+alt idempotency hit
+    Idem --> Consumer: existing -> ignore
+else new
+    Consumer -> Service: createOrReplace(dto)
+    Service -> Repo: findTopByTradeIdForUpdate(tradeId)\n(pessimistic lock)
+    Repo -> DB: SELECT ... FOR UPDATE
+    DB --> Repo: latestRecord
+    alt lower version
+        Repo --> Service: throw LOWER_VERSION
+        Service --> Consumer: error logged -> optionally save idempotency (failure)
+    else upsert or insert
+        Repo -> DB: INSERT/UPDATE
+        DB --> Repo: ok
+        Repo --> Service: saved
+        Service --> Consumer: success
+        Consumer -> Idem: save(idKey, 200, payload)
+    end
+end
+
+@enduml

@@ -1,0 +1,35 @@
+@startuml
+' Data model (ER) for Trade Store
+title Data Model - Trade & Idempotency
+
+entity "trades" as trades {
+  * trade_id : varchar
+  * version : integer
+  --
+    counterpartyid : varchar
+    bookid : varchar
+    maturitydate : date
+    createddate : timestamp
+    expired : boolean
+}
+
+entity "idempotency_keys" as idem {
+  * id : varchar
+  --
+    status_code : integer
+    response_body : text
+    created_at : timestamp
+}
+
+trades ||--|| idem : "no direct FK (separate concerns)"
+
+note left of trades
+  Primary key: (trade_id, version)
+  Index: idx_trades_tradeid_version_desc
+end note
+
+note right of idem
+  Cleanup recommended (e.g., delete after N days)
+end note
+
+@enduml
