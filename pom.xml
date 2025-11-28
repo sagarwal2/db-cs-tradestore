@@ -125,6 +125,7 @@
 					<failBuildOnCVSS>9.0</failBuildOnCVSS>
 					<format>ALL</format>
 					<skipSystemScope>false</skipSystemScope>
+					<disableOssIndex>true</disableOssIndex>
 				</configuration>
 			</plugin>
 		</plugins>
