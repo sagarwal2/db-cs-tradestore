@@ -21,4 +21,3 @@ mvn spring-boot:run
 ## Kafka
 - Example topic: `trades`
 - Messages should be JSON matching `TradeDto` shape.
-
